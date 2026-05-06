@@ -1,0 +1,194 @@
+# Spring Boot 配置文件
+# 配置应用程序的各种参数
+
+# 应用基础配置
+spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  # 应用名称
+  application:
+    name: test-platform
+
+  # 数据源配置
+  datasource:
+    # 数据库驱动类名
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 数据库连接URL
+    url: jdbc:mysql://localhost:3306/test_platform?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowMultiQueries=true
+    # 数据库用户名
+    username: root
+    # 数据库密码
+    password: Lb15359782595
+    # 连接池配置（HikariCP）
+    hikari:
+      # 连接池名称
+      pool-name: TestPlatformHikariCP
+      # 最小空闲连接数
+      minimum-idle: 5
+      # 最大连接数
+      maximum-pool-size: 15
+      # 连接超时时间（毫秒）
+      connection-timeout: 30000
+      # 空闲连接超时时间（毫秒）
+      idle-timeout: 600000
+      # 连接最大生命周期（毫秒）
+      max-lifetime: 1800000
+      # 连接测试查询
+      connection-test-query: SELECT 1
+
+  # Jackson配置
+  jackson:
+    # 日期格式
+    date-format: yyyy-MM-dd HH:mm:ss
+    # 时区
+    time-zone: GMT+8
+    # 序列化配置
+    serialization:
+      # 格式化输出
+      indent-output: true
+      # 忽略空值
+      write-null-map-values: false
+    # 反序列化配置
+    deserialization:
+      # 遇到未知属性不报错
+      fail-on-unknown-properties: false
+
+# 服务器配置
+server:
+  # 端口
+  port: 8080
+  # 上下文路径
+  servlet:
+    context-path: /
+  # 编码配置
+  tomcat:
+    uri-encoding: UTF-8
+
+# MyBatis-Plus配置
+mybatis-plus:
+  # 全局配置
+  global-config:
+    db-config:
+      # 主键类型：AUTO 数据库自增
+      id-type: AUTO
+      # 逻辑删除字段名
+      logic-delete-field: isDeleted
+      # 逻辑已删除值
+      logic-delete-value: 1
+      # 逻辑未删除值
+      logic-not-delete-value: 0
+      # 数据库表名前缀
+      table-prefix: t_
+  # 配置扫描xml路径
+  mapper-locations: classpath*:mapper/**/*Mapper.xml
+  # 类型别名包扫描路径
+  type-aliases-package: com.testplatform.entity
+  # 配置控制台日志
+  configuration:
+    # 日志实现类
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 是否开启自动驼峰命名规则映射
+    map-underscore-to-camel-case: true
+    # 缓存配置
+    cache-enabled: true
+    # 延迟加载配置
+    lazy-loading-enabled: true
+    # 多个延迟加载属性触发时加载配置
+    aggressive-lazy-loading: false
+
+# JWT配置
+jwt:
+  # JWT密钥，建议长度至少32位，生产环境请使用更复杂的密钥
+  secret: mySecretKey12345678901234567890123456789012
+  # JWT过期时间（毫秒），默认24小时
+  expiration: 86400000
+  # JWT签发者
+  issuer: test-platform
+  # JWT主题
+  subject: user-auth
+
+# 日志配置
+logging:
+  # 日志级别
+  level:
+    # 根日志级别
+    root: INFO
+    # 自定义包日志级别
+    com.testplatform: DEBUG
+    # MyBatis日志级别
+    com.baomidou.mybatisplus: DEBUG
+  # 日志文件配置
+  file:
+    # 日志文件名
+    name: logs/test-platform.log
+    # 日志文件大小限制
+    max-size: 10MB
+    # 日志文件保存天数
+    max-history: 30
+  # 控制台日志格式
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 自定义配置
+app:
+  # 应用版本
+  version: 1.0.0
+  # 应用描述
+  description: 基于Spring Boot的分层自动化接口测试平台
+  # 开发者信息
+  developer:
+    name: 测试平台开发团队
+    email: dev@testplatform.com
+  # 系统配置
+  config:
+    # 是否启用验证码
+    enable-captcha: false
+    # 是否启用注册邮箱验证
+    enable-email-verification: false
+    # 同一IP每天最大注册次数
+    max-register-per-ip-per-day: 10
+    # 同一IP每天最大登录失败次数
+    max-login-fail-per-ip-per-day: 20
+    # 登录失败锁定时间（分钟）
+    login-fail-lock-time: 30
+
+# 开发环境配置
+---
+# 使用 --- 分隔多个配置文件
+spring:
+  profiles: dev
+  # 开发环境启用热部署
+  devtools:
+    restart:
+      enabled: true
+  # 开发环境禁用缓存
+  thymeleaf:
+    cache: false
+
+# 生产环境配置
+---
+spring:
+  profiles: prod
+  # 生产环境关闭调试信息
+  devtools:
+    restart:
+      enabled: false
+  # 生产环境启用缓存
+  thymeleaf:
+    cache: true
+
+# 测试环境配置
+---
+spring:
+  profiles: test
+  # 测试环境使用H2内存数据库
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+springfox:
+  documentation:
+    enabled: false

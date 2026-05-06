@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn clean *)",
+      "Bash(net start *)",
+      "Bash(findstr \"MySQL\")",
+      "PowerShell(net start *)",
+      "Bash(mysql *)",
+      "Bash(mvn spring-boot:run *)",
+      "Bash(curl *)",
+      "Bash(mvn compile *)"
+    ]
+  }
+}
