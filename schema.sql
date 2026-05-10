@@ -128,3 +128,15 @@ ADD COLUMN `create_by` BIGINT NOT NULL COMMENT '创建人(关联 t_user.id)' AFT
 
 -- 可选：为 create_by 增加普通索引，提升查询自己项目列表时的性能
 ALTER TABLE `t_project` ADD INDEX `idx_create_by` (`create_by`);
+
+-- ============================================================
+-- M1 接口管理模块补丁 2026-05-10
+-- 为 t_api_definition 追加 create_by 与 is_deleted 字段：
+--   1. create_by 冗余存储创建人，避免每次查接口都 join t_project
+--   2. is_deleted 与 t_project 风格一致，采用逻辑删除
+-- ============================================================
+ALTER TABLE `t_api_definition`
+    ADD COLUMN `create_by` BIGINT NOT NULL COMMENT '创建人(关联 t_user.id)' AFTER `project_id`;
+
+ALTER TABLE `t_api_definition`
+    ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除(0:正常, 1:删除)';

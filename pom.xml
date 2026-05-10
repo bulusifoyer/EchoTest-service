@@ -33,6 +33,8 @@
         <swagger.version>2.9.2</swagger.version>
         <druid.version>1.2.16</druid.version>
         <mysql.version>8.0.33</mysql.version>
+        <okhttp.version>4.12.0</okhttp.version>
+        <jsonpath.version>2.9.0</jsonpath.version>
     </properties>
 
     <dependencies>
@@ -121,6 +123,20 @@
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
             <optional>true</optional>
+        </dependency>
+
+        <!-- OkHttp：M1 接口试调使用，真实发起 HTTP 请求 -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>${okhttp.version}</version>
+        </dependency>
+
+        <!-- JsonPath：M1 headers JSON 校验复用 + M2 变量提取/断言 -->
+        <dependency>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+            <version>${jsonpath.version}</version>
         </dependency>
     </dependencies>
 
