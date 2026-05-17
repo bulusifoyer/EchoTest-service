@@ -140,3 +140,16 @@ ALTER TABLE `t_api_definition`
 
 ALTER TABLE `t_api_definition`
     ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除(0:正常, 1:删除)';
+
+-- ============================================================
+-- M2 测试用例模块补丁 2026-05-10
+-- 为 t_test_case 追加 create_by 与 is_deleted 字段（与 M1 风格一致）：
+--   1. create_by 用例创建人，用于数据隔离
+--   2. is_deleted 用例软删除；步骤/变量提取/断言为子表，跟随用例物理删除
+-- ============================================================
+ALTER TABLE `t_test_case`
+    ADD COLUMN `create_by` BIGINT NOT NULL COMMENT '创建人(关联 t_user.id)' AFTER `project_id`;
+
+ALTER TABLE `t_test_case`
+    ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除(0:正常, 1:删除)';
+
