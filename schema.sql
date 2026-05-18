@@ -153,3 +153,40 @@ ALTER TABLE `t_test_case`
 ALTER TABLE `t_test_case`
     ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除(0:正常, 1:删除)';
 
+-- ============================================================
+-- M3 测试执行与报告模块补丁 2026-05-18
+-- 1. t_execution_report：补齐数据隔离字段 + 失败步骤数 + 总耗时 + 软删
+--    状态枚举统一为 RUNNING / PASSED / FAILED（与 detail.status 区分）
+-- 2. t_execution_detail：补齐执行序号 + 实际请求摘要拆分字段 + 失败原因 + 状态码
+--    状态枚举统一为 PASSED / FAILED
+-- 注意：actual_request / actual_response 字段保留并复用，存最终摘要 JSON；
+--       新增的 status_code / request_method / request_url / step_order / fail_reason
+--       是为前端报告页钻取/筛选/排序服务（避免每次解析 actual_request JSON）
+-- ============================================================
+
+ALTER TABLE `t_execution_report`
+    ADD COLUMN `project_id` BIGINT NOT NULL COMMENT '所属项目ID(冗余，便于 LEFT JOIN 列表与数据隔离)' AFTER `case_id`,
+    ADD COLUMN `create_by` BIGINT NOT NULL COMMENT '创建人(关联 t_user.id，数据隔离)' AFTER `project_id`,
+    ADD COLUMN `failed_steps` INT NOT NULL DEFAULT 0 COMMENT '失败步骤数(遇错即停时最多为 1)' AFTER `passed_steps`,
+    ADD COLUMN `total_duration_ms` BIGINT NOT NULL DEFAULT 0 COMMENT '总耗时(毫秒，从首步开始到末步结束)' AFTER `end_time`,
+    ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除(0:正常, 1:删除)';
+
+ALTER TABLE `t_execution_report`
+    MODIFY COLUMN `status` VARCHAR(20) NOT NULL COMMENT '最终结果(RUNNING / PASSED / FAILED)';
+
+ALTER TABLE `t_execution_report` ADD INDEX `idx_project_create_by` (`project_id`, `create_by`);
+
+ALTER TABLE `t_execution_detail`
+    ADD COLUMN `step_order` INT NOT NULL DEFAULT 0 COMMENT '执行序号(从 1 起步)' AFTER `step_id`,
+    ADD COLUMN `request_method` VARCHAR(10) COMMENT '实际请求方法(GET/POST/...)' AFTER `step_order`,
+    ADD COLUMN `request_url` VARCHAR(500) COMMENT '实际请求 URL(变量替换后)' AFTER `request_method`,
+    ADD COLUMN `status_code` INT COMMENT 'HTTP 响应状态码(网络异常时为 0)' AFTER `actual_response`,
+    ADD COLUMN `fail_reason` VARCHAR(500) COMMENT '失败原因(网络异常 / 断言失败描述)' AFTER `assert_result`;
+
+ALTER TABLE `t_execution_detail`
+    MODIFY COLUMN `status` VARCHAR(20) NOT NULL COMMENT '单步结果(PASSED / FAILED)';
+
+-- 修正历史脏类型：原 schema 中 elapsed_ms 误写为 LONG，被 MySQL 解析为 MEDIUMTEXT
+ALTER TABLE `t_execution_detail`
+    MODIFY COLUMN `elapsed_ms` BIGINT COMMENT '响应耗时(毫秒)';
+

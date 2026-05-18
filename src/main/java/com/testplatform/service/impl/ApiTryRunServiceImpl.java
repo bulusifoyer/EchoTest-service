@@ -1,7 +1,5 @@
 package com.testplatform.service.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.testplatform.common.Result;
 import com.testplatform.common.UserContext;
 import com.testplatform.entity.ApiDefinition;
@@ -13,6 +11,7 @@ import com.testplatform.mapper.ApiDefinitionMapper;
 import com.testplatform.mapper.EnvironmentMapper;
 import com.testplatform.mapper.ProjectMapper;
 import com.testplatform.service.ApiTryRunService;
+import com.testplatform.service.execution.HeaderMerger;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +21,6 @@ import org.springframework.util.StringUtils;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -49,11 +47,6 @@ public class ApiTryRunServiceImpl implements ApiTryRunService {
 
     @Autowired
     private ProjectMapper projectMapper;
-
-    /**
-     * ObjectMapper 非静态且不复用全局 Bean，避免和 JsonUtils 耦合；反序列化 headers JSON 字符串 → Map
-     */
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public Result<ApiTryRunResultVO> tryRun(ApiTryRunDTO dto) {
@@ -84,7 +77,7 @@ public class ApiTryRunServiceImpl implements ApiTryRunService {
         // 3. 合并 headers：env.global → api.requestHeaders → dto.overrideHeaders（后者覆盖前者）
         Map<String, String> finalHeaders;
         try {
-            finalHeaders = mergeJsonHeaders(
+            finalHeaders = HeaderMerger.mergeJsonHeaders(
                     env.getGlobalHeaders(),
                     api.getRequestHeaders(),
                     dto.getOverrideHeaders());
@@ -98,7 +91,7 @@ public class ApiTryRunServiceImpl implements ApiTryRunService {
                 : api.getRequestBody();
 
         // 5. body 非空且无 Content-Type 时自动补 application/json
-        if (StringUtils.hasText(finalBody) && !containsHeaderIgnoreCase(finalHeaders, "Content-Type")) {
+        if (StringUtils.hasText(finalBody) && !HeaderMerger.containsHeaderIgnoreCase(finalHeaders, "Content-Type")) {
             finalHeaders.put("Content-Type", "application/json;charset=UTF-8");
         }
 
@@ -128,7 +121,7 @@ public class ApiTryRunServiceImpl implements ApiTryRunService {
         String method = api.getMethod() == null ? "GET" : api.getMethod().toUpperCase();
         if (StringUtils.hasText(finalBody)) {
             // 用 Content-Type 构造 MediaType，否则默认 application/octet-stream
-            String ct = getHeaderIgnoreCase(finalHeaders, "Content-Type");
+            String ct = HeaderMerger.getHeaderIgnoreCase(finalHeaders, "Content-Type");
             MediaType mediaType = ct != null ? MediaType.parse(ct) : null;
             requestBody = RequestBody.create(finalBody, mediaType);
         }
@@ -175,45 +168,7 @@ public class ApiTryRunServiceImpl implements ApiTryRunService {
     }
 
     /**
-     * 将多层 JSON 字符串 headers 合并为 Map
-     * 调用顺序：低优先级 → 高优先级，后者覆盖前者
-     * 空字符串层会被跳过
+     * 请求头合并/查找/移除等工具已抽取到 {@link com.testplatform.service.execution.HeaderMerger}，
+     * 以便 M3 执行引擎与单接口试调共用，避免两边算法分裂。
      */
-    private Map<String, String> mergeJsonHeaders(String... layersFromLowToHigh) throws IOException {
-        // 使用 LinkedHashMap 保留插入顺序；大小写比较在 containsHeaderIgnoreCase 中完成
-        Map<String, String> merged = new LinkedHashMap<>();
-        if (layersFromLowToHigh == null) {
-            return merged;
-        }
-        for (String layer : layersFromLowToHigh) {
-            if (!StringUtils.hasText(layer)) {
-                continue;
-            }
-            Map<String, String> one = objectMapper.readValue(
-                    layer, new TypeReference<TreeMap<String, String>>() {});
-            // 高优先级层：若同名 key（忽略大小写）已存在于 merged，先移除旧 key 再放入新值，保证覆盖
-            for (Map.Entry<String, String> e : one.entrySet()) {
-                removeHeaderIgnoreCase(merged, e.getKey());
-                merged.put(e.getKey(), e.getValue());
-            }
-        }
-        return merged;
-    }
-
-    private boolean containsHeaderIgnoreCase(Map<String, String> headers, String name) {
-        return getHeaderIgnoreCase(headers, name) != null;
-    }
-
-    private String getHeaderIgnoreCase(Map<String, String> headers, String name) {
-        if (headers == null || name == null) return null;
-        for (Map.Entry<String, String> e : headers.entrySet()) {
-            if (name.equalsIgnoreCase(e.getKey())) return e.getValue();
-        }
-        return null;
-    }
-
-    private void removeHeaderIgnoreCase(Map<String, String> headers, String name) {
-        if (headers == null || name == null) return;
-        headers.entrySet().removeIf(e -> name.equalsIgnoreCase(e.getKey()));
-    }
 }

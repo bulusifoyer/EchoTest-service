@@ -44,14 +44,39 @@
 - **MVP 边界**: 断言类型仅支持 STATUS_CODE / JSON_PATH（DATABASE 类型为规划项）
 - **日期**: 2026-05-10
 
-### 6. 测试执行与报告模块 ⏳
+### 6. 测试执行与报告模块 ✅
 
-- **DDL**: `t_execution_report` 执行报告表, `t_execution_detail` 执行明细表
-- **说明**: 执行测试用例，生成测试报告，记录请求/响应详情
+- **DDL**: `t_execution_report` + 补丁（project_id / create_by / failed_steps / total_duration_ms / is_deleted）；`t_execution_detail` + 补丁（step_order / request_method / request_url / status_code / fail_reason；status 枚举改 PASSED/FAILED；elapsed_ms 修正为 BIGINT）
+- **功能**: 同步串行执行用例（遇错即停） + ${var} 单层变量替换（仅 URL/headers/body） + JsonPath 提取 + 三种 operator 断言 + 三层 headers 合并复用 M1
+- **接口**: `POST /api/executions/run`（同步返回 reportId）、`GET /api/executions/{id}`（含明细树）、`GET /api/executions/list/{projectId}`、`DELETE /api/executions/{id}`（软删）
+- **数据隔离**: 用例 / 环境 / 步骤接口的归属严格按 create_by 校验；env 必须与 case 同项目；列表查询 LEFT JOIN caseName + envName
+- **重构**: 把 M1 的 `mergeJsonHeaders` 等工具方法抽到 `service/execution/HeaderMerger`，M3 与 M1 试调共用
+- **MVP 边界**: 同步执行（无任务队列），不支持 SKIP，不支持 DATABASE 断言
+- **日期**: 2026-05-18
 
 ---
 
 ## 每日进展记录
+
+### 2026-05-18
+
+#### 后端 (EchoTest-service) — M3 执行引擎与报告落库
+- **DDL 补丁**：schema.sql 末尾追加 M3 ALTER 段
+  - `t_execution_report`：补 `project_id` / `create_by` / `failed_steps` / `total_duration_ms` / `is_deleted`；`status` 注释统一为 `RUNNING / PASSED / FAILED`；增加 `idx_project_create_by` 索引
+  - `t_execution_detail`：补 `step_order` / `request_method` / `request_url` / `status_code` / `fail_reason`；`status` 改为 `PASSED / FAILED`；修正历史脏类型 `elapsed_ms` LONG → BIGINT
+  - 已应用到本地 `echotest-mysql` 容器
+- **执行引擎核心**（`service/execution/` 包，6 个新文件）
+  - `VariableContext`：`${var}` 单层替换，未命中保持原文，不递归
+  - `Asserter`：STATUS_CODE / JSON_PATH × EQUALS / CONTAINS / GREATER_THAN
+  - `Extractor`：JsonPath 提取，失败仅记日志不阻断（写入 detail.assertResult._extracts）
+  - `HttpExecutor`：OkHttp 真实发起，网络异常统一 ExecuteResult 兜底（不抛出）
+  - `HeaderMerger`：从 `ApiTryRunServiceImpl` 抽出的公共工具，M1 试调与 M3 引擎共用
+  - `ExecutionEngine`：同步串行 + 遇错即停 + 三层 headers 合并 + Content-Type 自动补 + 三处变量替换 + 写报告/明细
+- **业务 + Controller**：`ExecutionService` / `ExecutionServiceImpl` / `ExecutionController`，4 个 RESTful 接口
+- **新增实体 / Mapper / DTO**：`ExecutionReport` / `ExecutionDetail` 实体；`ExecutionReportMapper`（含 LEFT JOIN VO 列表）+ `ExecutionDetailMapper`；`ExecutionRunDTO` / `ExecutionReportVO` / `ExecutionDetailVO` / `ExecutionReportDetailVO`
+- **测试**：`AsserterTest`（8 个）+ `VariableContextTest`（6 个）+ `ExecutionEngineTest`（2 个：PASSED 链路 + 遇错即停 FAILED 链路）；`ApiTryRunServiceTest` 在 HeaderMerger 重构后仍全过
+- **验收**：`mvn test` 全部 25 测试通过；编译干净
+- **契约同步**：父目录 `docs/api-contract.md` 新增 §6 测试执行与报告（替换原占位段），错误码 §7、联调 §8
 
 ### 2026-05-10
 
